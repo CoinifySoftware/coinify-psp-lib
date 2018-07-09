@@ -18,8 +18,9 @@ Installation
 
 Insert the following script into your project a common place is to insert it into the head of your index file.
 
+```
 <script src="https://cdnjs.cloudflare.com/libs/coinify-psp-lib/1.0.0/coinify-psp-lib.min.js" type="text/javascript"></script>
-
+```
 
 Error handling
 -----------
