@@ -20,28 +20,6 @@ Insert the following script into your project a common place is to insert it int
 
 <script src="https://cdnjs.cloudflare.com/libs/coinify-psp-lib/1.0.0/coinify-psp-lib.min.js" type="text/javascript"></script>
 
-Examples - Store card
------------
-
-Coinify.saveCard
-
-Description
-
-Parses and builds the data for a credit card into a format that the PSP can understand. 
-
-Take note that method is generic in the sense that if we later want to implement support for other PSP’s handle how the card data is applied we can do it with this method.  We need this to be able to abstract the way the card data is processed by the PSP ensuring that we can introduce additional PSP’s in the future while not having to change the front-end implementation.
-
-Arguments
-
-“Save card payload”
-A “Save card payload” - the payload needed by the psp to save the card.
-
-“PSP Type”
-The type of PSP.
-
-Returns
-
-The object with the id of the saved card.
 
 Error handling
 -----------
