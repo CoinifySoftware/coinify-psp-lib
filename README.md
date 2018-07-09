@@ -26,6 +26,23 @@ Error handling
 
 All response objects returned from the library contains an error paramter. If the error parameter is not null, it means that the 
 
+Example of object returned when no error has occured. 
+```json-doc
+{
+  "error": null,
+  "errorCode": null,
+  ... other object attributes ...
+}
+```
+
+Example of object returned when an error has occured. 
+```json-doc
+{
+  "error": "Unknown error has happened when trying to pay",
+  "errorCode": "01",
+  ... other object attributes ...
+}
+```
 
 Register Card
 -----------
@@ -82,7 +99,8 @@ Example of card object returned for long term saved card.
   "bin":"401200",
   "expiryDate":"0120",
   "cardBrand":"visa",
-  "sessionToken": "xxxx-xxxx-xxxx-xxxx"
+  "sessionToken": "xxxx-xxxx-xxxx-xxxx",
+  "error": null
 }
 ```
 
@@ -91,7 +109,8 @@ Example of card object returned for short term saved card.
 ```json-doc
 {
   "ccCardToken": "xxxx-xxxx-xxxx-xxxx",
-  "sessionToken": "xxxx-xxxx-xxxx-xxxx"
+  "sessionToken": "xxxx-xxxx-xxxx-xxxx",
+  "error": null 
 }
 ```
 
