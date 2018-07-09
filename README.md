@@ -10,11 +10,8 @@ This library is the first step of creating a custom payment page when integratin
 1. Save a card for later usage through custom form.
 1. Create custom form to input (and optionally register) card data when paying for a trade with card.
 1. Create custom form to input card data and saving a card for payments.
-1. Handling the following aspects of paying with a card input through custom form or saved card.
-  1.1. Showing 3D Secure authentication pages.
-  1.1. Authentication flow.
+1. Handling the Authentication aspects (3D Secure) of paying with a card input through custom form or saved card.
 1. Showing hosted payment frame for Coinify partner's integrating with older card payment solutions.
-
 
 Installation
 -----------
