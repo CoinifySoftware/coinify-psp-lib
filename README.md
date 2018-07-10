@@ -205,7 +205,7 @@ function onCardSelectedInDropdown( card ) {
 ```
 
 3. Lastly, when the user clicks "pay" the application will have to create a trade with  requested quote and the selected
-card as payment method. We do that by invoking ```Coinify.setCardAsTradePaymentOption``` on the details and passing on the
+card as payment method. We do that by invoking `Coinify.setCardAsTradePaymentOption` on the tradeInfo object with the `selected card` Object.
 
 ```javascript
 const tradeInfo = {
