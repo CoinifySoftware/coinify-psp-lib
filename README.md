@@ -171,7 +171,7 @@ Example - Pay with a card using a custom form and saving the card.
 
 ```javascript
 const tradeInfo = {
-  ... payload useable to save card ...
+  ... payload usd to create a trade ...
 };
 const userInputCardDataFromCustomForm = {
   cardNumber: "1111 2222 3333 4444",
@@ -198,7 +198,7 @@ Example - Pay with a card using a custom form without saving the card.
 
 ```javascript
 const tradeInfo = {
-  ... payload useable to save card ...
+  ... payload usd to create a trade ...
 };
 const userInputCardDataFromCustomForm = {
   cardNumber: "1111 2222 3333 4444",
