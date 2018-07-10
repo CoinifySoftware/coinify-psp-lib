@@ -136,9 +136,9 @@ The arguments returned when creating a trade through ```POST: /trades``` is just
 
 Key      | Type       | Description        |
 ---------|------------|--------------------|
-`url`     | String     | The url to either the 3d secure authentication page or the hosted payment page.
-`urlType`     | String     | 3dsecure | hosted-payment-page.
-`container`     | HtmlElement     | ( Optional ) This is the optional container that we want to embed the payment frame. If undefined the payment frame will be shown as a overlay.
+`data.url`     | String     | The url to either the 3d secure authentication page or the hosted payment page.
+`data.urlType`     | String     | 3dsecure | hosted-payment-page.
+`data.container`     | HtmlElement     | ( Optional ) This is the optional container that we want to embed the payment frame. If undefined the payment frame will be shown as a overlay.
 
 Returns
 
@@ -186,7 +186,7 @@ Coinify.registerCard( { cardData: userInputCardDataFromCustomForm, saveCard: tr
   tradeInfo.transferIn.details.sessionToken = response.sessionToken;
   http.post( "/trades", tradeInfo ).then( response => {
     const details = response.transferIn.details;
-    Coinify.handleTradePaymentInfo( details.redirectUrl, details.is3DS, details.provider ).then( response => {
+    Coinify.handleTradePaymentInfo( details ).then( response => {
       … the payment url shown in the iframe returns...
    } );
   } );
@@ -213,12 +213,15 @@ Coinify.registerCard( { cardData: userInputCardDataFromCustomForm, saveCard: fa
   tradeInfo.transferIn.details.sessionToken = response.sessionToken;
   http.post( "/trades", tradeInfo ).then( response => {
     const details = response.transferIn.details;
-    Coinify.pay( details.redirectUrl, details.is3DS, details.provider ).then( response => {
+    Coinify.handleTradePaymentInfo( details ).then( response => {
      … the payment url shown in the iframe returns...
    } );
   } );
 } );
 ```
+
+
+
 
 
 
