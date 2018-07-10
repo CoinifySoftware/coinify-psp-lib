@@ -16,6 +16,12 @@ This library is the first step of creating a custom payment page when integratin
 Installation
 -----------
 
+By NPM;
+
+npm i coinify-psp-lib --save
+
+Or as script tag;
+
 Insert the following script into your project a common place is to insert it into the head of your index file.
 
 ```
@@ -50,12 +56,12 @@ Register Card
 
 ```Coinify.registerCard( ... )```
 
-Registers a card with the PSP and returns a token for long term or short term usage.
+Registers a card with the PSP for later payment. The functionality is used to tokenize a card using a custom form.
 
-The mehod can return a savedCard or tempoary token depending in context the method is used.
+A card can be registered for two types of usage;
 
-After the card is registered it's data will be represented by a token. For short term registered cards the token will be
-
+1. Token used to pay for specific trade without saving card for later usage.
+2. Persistant card token which can be used to repeatantly pay for trades. When the card is saved the card appears in the card list.
 
 Key      | Type       | Description        |
 ---------|------------|--------------------|
@@ -66,7 +72,7 @@ Key      | Type       | Description        |
 `cardData.expireYear`  | String    | The expire year in the format 2020 ( not 20 ).
 `cardData.CVV`  | String    | Card's CVV code.
 
-Example of argument filled in when saving a card for long term usage.
+Example of argument filled in when registering a card for payment and saving it for future uses.
 ```
 {
   cardData: {
@@ -80,7 +86,7 @@ Example of argument filled in when saving a card for long term usage.
 }
 ```
 
-Example of argument filled in when saving a card for short term usage.
+Example of argument filled in when registering a card for payment through without saving it - the card can be used to pay a single time but will not appear in the list of saved cards.
 ```
 {
   cardData: { ... valid card data ... },
@@ -90,7 +96,7 @@ Example of argument filled in when saving a card for short term usage.
 
 Returns
 
-Example of card object returned for long term saved card.
+Example of card object returned for card registered for future purchases.
 
 ```json-doc
 {
@@ -105,7 +111,7 @@ Example of card object returned for long term saved card.
 }
 ```
 
-Example of card object returned for short term saved card.
+Example of card object returned for card registered for a single purchase.
 
 ```json-doc
 {
@@ -115,14 +121,13 @@ Example of card object returned for short term saved card.
 }
 ```
 
-
 handleTradePaymentInfo - Open payment url
 -----------
 
 ```Coinify.handleTradePaymentInfo( ... )```
 
 As part of paying for a trade we retrive a payment url, this is handled through the method called handleTradePaymentInfo.
-
+s
 The payment url can represent the following; 
 
  - 3D Secure authentication page. - Used when paying using a 3d secure card.
@@ -149,6 +154,20 @@ Returns
 ```
 
 
+setCardAsTradePaymentOption
+-----------
+
+```Coinify.setCardAsTradePaymentOption( tradeCreationArguments, card )```
+
+Sets a saved card as choosen payment method to the arguments passed when creating a trade object through ```POST: /trades``` 
+
+Arguments
+
+Key      | Type       | Description        |
+---------|------------|--------------------|
+`tradeCreationArguments`     | Object     | The object passed to ```POST: /trades``` 
+`card`     | Object     | Card object representing the selected card we wish to pay with ( see public api for GET: /cards end-point )
+
 Example - How to save a card for future usages.
 -----------
 
@@ -162,6 +181,42 @@ const userInputCardDataFromCustomForm = {
 };
 Coinify.registerCard( { cardData: userInputCardDataFromCustomForm, saveCard: true } ).then( (response) => {
   … the card has not been saved if response doesnt contain an error: see error handling ...
+} );
+```
+
+Example - Pay with a saved card.
+-----------
+
+1. First, the app must retrive the list of saved cards throug the cards api. See public API documentation for info on the end-point.
+
+```javascript
+http.get( "/cards").then( _cardList => {
+  this.cardList = _cardList;
+  this.presentCardOptionsInDropdown( _cardList );
+} );
+```
+
+2. Secondly, the app should let the user choose which card he/she wants to pay with.
+
+```javascript
+function onCardSelectedInDropdown( card ) {
+  this.selectedCard = card; // the local variable represents the card needed for payment later on.
+}
+```
+
+3. Lastly, when the user clicks "pay" the application will have to create a trade with  requested quote and the selected
+card as payment method. We do that by invoking ```Coinify.setCardAsTradePaymentOption``` on the details and passing on the
+
+```javascript
+const tradeInfo = {
+  ... payload with info used to create a trade ...
+};
+Coinify.setCardAsTradePaymentOption( tradeInfo, this.selectedCard ); // After this we have now made sure that the tradeInfo object contains teh selected card/payment details required to pay with the selected card.
+http.post( "/trades", tradeInfo ).then( response => {
+  const details = response.transferIn.details;
+  Coinify.handleTradePaymentInfo( details ).then( response => {
+    … the payment url shown in the iframe returns...
+ } );
 } );
 ```
 
@@ -182,8 +237,7 @@ const userInputCardDataFromCustomForm = {
 };
 Coinify.registerCard( { cardData: userInputCardDataFromCustomForm, saveCard: true } ).then( (response) => {
   … the card has not been saved if response doesnt contain an error: see error handling ...
-  tradeInfo.transferIn.details.upoId = response.upoId;
-  tradeInfo.transferIn.details.sessionToken = response.sessionToken;
+  Coinify.setCardAsTradePaymentOption( tradeInfo, response ); // After this we have now made sure that the tradeInfo object contains teh selected card/payment details required to pay with the selected card.
   http.post( "/trades", tradeInfo ).then( response => {
     const details = response.transferIn.details;
     Coinify.handleTradePaymentInfo( details ).then( response => {
@@ -209,8 +263,7 @@ const userInputCardDataFromCustomForm = {
 };
 Coinify.registerCard( { cardData: userInputCardDataFromCustomForm, saveCard: false } ).then( (response) => {
   … the card has not been registered for temporary usage if response doesnt contain an error: see error handling ...
-  tradeInfo.transferIn.details.ccTempToken = response.ccTempToken;
-  tradeInfo.transferIn.details.sessionToken = response.sessionToken;
+  Coinify.setCardAsTradePaymentOption( tradeInfo, response ); // After this we have now made sure that the tradeInfo object contains teh selected card/payment details required to pay with the selected card.
   http.post( "/trades", tradeInfo ).then( response => {
     const details = response.transferIn.details;
     Coinify.handleTradePaymentInfo( details ).then( response => {
