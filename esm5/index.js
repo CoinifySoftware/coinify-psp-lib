@@ -1,2 +1,2 @@
-export { Greeter } from './Greeter';
+export * from './Coinify';
 //# sourceMappingURL=index.js.map

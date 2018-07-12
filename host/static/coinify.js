@@ -1,65 +1,29 @@
-import { IS_DEV } from './environment';
+console.log("*** Coinify library ***");
+(function() {
+  window.Coinify = {
+    loaded: false,
+    loading: false,
+    overlay: undefined,
+    registerCard: undefined,
+    initPSP: undefined,
+    PSPType: {
+      safecharge: 'safecharge'
+    }
+  };
 
-export class CardData {
-  public cardNumber: string = '';
-  public cardHolder: string = '';
-  public expireMonth: string = '';
-  public expireYear: string = '';
-  public CVV: number = 0;
-}
-
-export class UrlData {
-  public is3DS = false;
-  public url = '';
-  public callbackUrl = '';
-  public PaReq = '';
-}
-
-export class Coinify {
   // Constants.
-  public static Register = {
+  window.Coinify.Register = {
     Permanently: 1,
     ForTemporaryUse: 2
   };
 
-  public static PSPType = {
-    safecharge: 'safecharge',
-    isignthis: 'isignthis'
-  };
+  window.Coinify.callbackUrl3DS = "localhost:6564";
+  window.Coinify.callbackUrlPayment = "localhost:1234";
 
-  public static getRequest( url: string ) {
+  window.Coinify.getRequest = ( url, error ) => {
     return new Promise( (callback, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', url);
-      xhr.withCredentials = true;
-      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.onreadystatechange = () => {
-        if ( xhr.readyState === 4 ) {
-          if ( xhr.status === 200 || ( xhr.status === 0 && xhr.responseText !== '' ) ) {
-            callback({
-              url: url,
-              status: 200,
-              body: xhr.responseText || ''
-            });
-          }
-          else {
-            reject({
-              url: url,
-              status: xhr.status,
-              body: xhr.responseText || ''
-            });
-          }
-        }
-      };
-      xhr.send();
-    } );
-  }
-
-  public static postRequest( url: string, error: Function ) {
-    return new Promise( (callback, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', url);
       xhr.withCredentials = true;
       xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
       xhr.setRequestHeader('Content-Type', 'application/json');
@@ -83,44 +47,23 @@ export class Coinify {
       };
       xhr.send();
     } );
-  }
+  };
 
-  public static applyCardToTradeTransferInDetails( tradeInfo: any, payload: any, pspType: string, cardData: any ): any {
+  window.Coinify.applyCardData = ( payload, pspType, cardData ) => {
     if ( pspType !== Coinify.PSPType.safecharge ) {
       throw new Error( 'Invalid psp: ' + pspType );
     }
-    if ( !tradeInfo || !tradeInfo.transferIn ) {
-      throw new Error( 'Invalid transfer in method.' );
-    }
-    // payload = Object.assign( {}, payload || {} );
-    tradeInfo.transferIn.details = cardData;
-    return tradeInfo;
-  }
-  
-  loaded = false;
-  loading = false;
-  overlay: any = undefined;
-  loadingOverlay: any = undefined;
-  container3ds: any = undefined;
+    payload = Object.assign({},payload || {});
+    payload.cardData = cardData;
+    return payload;
+  };
 
-  callbackUrl3DS = "localhost:6564";
-  callbackUrlPayment = "localhost:1234";
-
-  container3dsForm: any = undefined;
-  container3dsi1: any = undefined;
-  container3dsi2: any = undefined;
-  container3dsFrame: any = undefined;
-
-  containerPay: any = undefined;
-
-  containerIsOverlay = false;
-
-  private createOverlay() {
-    if ( this.overlay ) {
-      return this.overlay;
+  window.Coinify.createOverlay = () => {
+    if ( window.Coinify.overlay ) {
+      return window.Coinify.overlay;
     }
     console.log( "Creating overlay" );
-    const o = this.overlay = document.createElement( 'div' );
+    const o = window.Coinify.overlay = document.createElement( 'div' );
     o.className = "c-overlay c-is-hidden";
     o.id = "c-overlay";
     const body = document.getElementsByTagName('body')[0];
@@ -163,22 +106,22 @@ export class Coinify {
     `;
     const style = document.createElement('style');
     style.type = 'text/css';
-    if ( (style as any).styleSheet ) {
-      (style as any).styleSheet.cssText = css;
+    if ( style.styleSheet ) {
+      style.styleSheet.cssText = css;
     } else {
       style.appendChild( document.createTextNode(css) );
     }
     const head = document.head || document.getElementsByTagName('head')[0];
     (head || body).appendChild(style);
     return o;
-  }
+  };
 
-  private createLoadingOverlay () {
-    if ( this.loadingOverlay ) {
-      return this.loadingOverlay;
+  window.Coinify.createLoadingOverlay = () => {
+    if ( window.Coinify.loadingOverlay ) {
+      return window.Coinify.loadingOverlay;
     }
     console.log( "Creating overlay" );
-    const o = this.loadingOverlay = document.createElement( 'div' );
+    const o = window.Coinify.loadingOverlay = document.createElement( 'div' );
     o.className = "c-working-overlay c-is-hidden";
     o.id = "c-working-overlay";
     const body = document.getElementsByTagName('body')[0];
@@ -197,27 +140,27 @@ export class Coinify {
     `;
     const style = document.createElement('style');
     style.type = 'text/css';
-    if ( (style as any).styleSheet ) {
-      (style as any).styleSheet.cssText = css;
+    if ( style.styleSheet ) {
+      style.styleSheet.cssText = css;
     } else {
       style.appendChild( document.createTextNode(css) );
     }
     const head = document.head || document.getElementsByTagName('head')[0];
     (head || body).appendChild(style);
     return o;
-  }
+  };
 
-  private create3DSFrame ( url: string, PARequest: string, iframeCallbackUrl: string, cb: any | Function ) {
-    let o = this.container3ds;
+  window.Coinify.create3DSFrame = ( url, PARequest, iframeCallbackUrl, cb ) => {
+    let o = window.Coinify.container3ds;
 
     if ( !o ) {
       const body = document.getElementsByTagName('body')[0];
-      o = this.container3ds = document.createElement( 'div' );
+      o = window.Coinify.container3ds = document.createElement( 'div' );
       o.style.backgroundColor = "white";
-      const form = this.container3dsForm = document.createElement( 'form' );
-      const i1 = this.container3dsi1 = document.createElement( 'input' );
-      const i2 = this.container3dsi2 = document.createElement( 'input' );
-      const _iframe = this.container3dsFrame = document.createElement( 'iframe' );
+      const form = window.Coinify.container3dsForm = document.createElement( 'form' );
+      const i1 = window.Coinify.container3dsi1 = document.createElement( 'input' );
+      const i2 = window.Coinify.container3dsi2 = document.createElement( 'input' );
+      const _iframe = window.Coinify.container3dsFrame = document.createElement( 'iframe' );
 
       o.className = "c-stretch";
       form.setAttribute("target", "coinify-3dsframe");
@@ -237,26 +180,26 @@ export class Coinify {
       o.appendChild( _iframe );
       body.appendChild( o );
     }
-    this.container3dsForm.setAttribute("action", url);
-    this.container3dsi1.setAttribute("value", PARequest);
-    this.container3dsi2.setAttribute("value", iframeCallbackUrl );
+    window.Coinify.container3dsForm.setAttribute("action", url);
+    window.Coinify.container3dsi1.setAttribute("value", PARequest);
+    window.Coinify.container3dsi2.setAttribute("value", iframeCallbackUrl );
     //console.log("submit paRequest:" + PARequest + " url:" + url );
 
     var callback = cb;
-    let eventHandler: EventListenerOrEventListenerObject; // = undefined;
-    eventHandler = ( event: any ) => {
+    let eventHandler;
+    eventHandler = ( event ) => {
       const data = event.data ? event.data.toString() : '';
       if ( data.indexOf( '[SC-Embed]' ) != 0 ) {
         return;
       }
-      window.removeEventListener( 'message', eventHandler );
+      window.removeEventListener( "message", eventHandler );
       const msg = JSON.parse( event.data.replace( '[SC-Embed]', '' ) );
-      // console.log( "msg ", msg );
+      console.log( "msg ", msg );
       if ( msg.command == 'close' ) {
         if ( o.parentNode ) {
           o.parentNode.removeChild( o );
-          if ( this.containerIsOverlay ) {
-            this.showOverlay(false);
+          if ( Coinify.containerIsOverlay ) {
+            Coinify.showOverlay(false);
           }
         }
         if ( callback ) {
@@ -265,21 +208,21 @@ export class Coinify {
         }
       }
     };
-    window.addEventListener( 'message', eventHandler, true );
+    window.addEventListener( "message", eventHandler, true );
 
     setTimeout( () => {
-      this.container3dsForm.submit();
+      window.Coinify.container3dsForm.submit();
     } );
 
     return o;
   }
 
-  private createPaymentFrame ( url: string, cb: Function ) {
-    let o = this.containerPay;
+  window.Coinify.createPaymentFrame = ( url, cb ) => {
+    let o = window.Coinify.containerPay;
   
     if ( !o ) {
       const body = document.getElementsByTagName('body')[0];
-      o = this.containerPay = document.createElement( 'div' );
+      o = window.Coinify.containerPay = document.createElement( 'div' );
       o.className = "c-stretch";
       const _iframe = document.createElement( 'iframe' );
       _iframe.setAttribute("id", "redirect-pay");
@@ -290,22 +233,22 @@ export class Coinify {
       body.appendChild( o );
     }
 
-    let callback: any = cb;
-    let eventHandler: EventListenerOrEventListenerObject;
-    eventHandler = ( event: any ) => {
+    let callback = cb;
+    let eventHandler;
+    eventHandler = ( event ) => {
       //console.log("eventHandler ", event );
       const data = event.data ? event.data.toString() : '';
       if ( data.indexOf( '[SC-Embed]' ) != 0 ) {
         return;
       }
-      window.removeEventListener( 'message', eventHandler );
+      window.removeEventListener( "message", eventHandler );
       const msg = JSON.parse( data.replace( '[SC-Embed]', '' ) );
       // console.log( "msg ", msg );
       if ( msg.command == 'close' ) {
         if ( o.parentNode ) {
           o.parentNode.removeChild( o );
-          if ( this.containerIsOverlay ) {
-            this.showOverlay(false);
+          if ( Coinify.containerIsOverlay ) {
+            Coinify.showOverlay(false);
           }
         }
         if ( callback ) {
@@ -314,13 +257,13 @@ export class Coinify {
         }
       }
     };
-    window.addEventListener( 'message', eventHandler, true );
+    window.addEventListener( "message", eventHandler, true );
 
     return o;
   }
 
-  private showOverlay ( value: boolean = true, container: any = null ) {
-    const overlay = this.overlay;
+  window.Coinify.showOverlay = ( value, container ) => {
+    const overlay = window.Coinify.overlay;
     if ( value || value === undefined ) {
       overlay.classList.remove("c-is-hidden");
       if ( container ) {
@@ -329,139 +272,94 @@ export class Coinify {
     } else {
       overlay.classList.add("c-is-hidden");
     }
-  }
+  };
 
-  private showLoadingOverlay ( value: boolean = true ) {
-    const overlay = this.createLoadingOverlay();
+  window.Coinify.showLoadingOverlay = ( value ) => {
+    const overlay = window.Coinify.createLoadingOverlay();
     if ( value || value === undefined ) {
       overlay.classList.remove("c-is-hidden");
     } else {
       overlay.classList.add("c-is-hidden");
     }
-  }
+  };
 
-  private get Safecharge() {
-    return (window as any).Safecharge;
-  }
-
-  private initPSP ( pspType: string ) {
+  window.Coinify.initPSP = ( pspType ) => {
     if ( pspType !== Coinify.PSPType.safecharge ) {
       throw new Error( 'Invalid psp :' + pspType );
     }
-    if ( this.loading ) {
+    if ( window.Coinify.loading ) {
       throw new Error( "Already loading" );
     }
     return new Promise( (cb, reject) => {
 
-      if ( this.loaded ) {
-        cb( this.Safecharge );
+      if ( window.Coinify.loaded ) {
+        cb( window.Safecharge );
         return;
       }
 
       // Bootstrap SafeCharge and then execute the create token request,
-      var self = this;
+      var self = window.Coinify;
       self.loaded = false;
       self.loading = true;
       var _script = document.createElement( 'script' );
       _script.type = 'text/javascript';
       _script.src = 'https://cdn.safecharge.com/js/v1/safecharge.js';
       _script.onload = () => {
-        self.loaded = !!this.Safecharge;
+        self.loaded = !!window.Safecharge;
         self.loading = false;
         if ( !self.loaded ) {
           throw new Error( 'Failed to load Safecharge library' );
         }
-        cb( this.Safecharge );
+        cb( window.Safecharge );
       };
       const body = document.getElementsByTagName('body')[0];
       body.appendChild(_script);
     } );
-  }
+  };
 
   /**
    * Invoke the registerCard with some info like the following.
    */
-  private createTemporaryCardToken ( cardInfo: CardData, pspType: string ) {
+  window.Coinify.createTemporaryCardToken = ( cardInfo, pspType ) => {
     if ( pspType !== Coinify.PSPType.safecharge ) {
       throw new Error( 'Invalid psp :' + pspType );
     }
     return new Promise( (cb, reject) => {
-      this.initPSP( pspType ).then( ( psp: any ) => {
-        psp.card.createToken( cardInfo, ( e: Event ) => {
+      window.Coinify.initPSP( pspType ).then( ( psp ) => {
+        psp.card.createToken( cardInfo, ( e ) => {
           cb( e );
         } );
       } );
     });
-  }
+  };
 
-  private openPaymentUrl ( urlData: UrlData, pspType: string, container: any ) {
-    if ( !pspType || pspType !== Coinify.PSPType.safecharge ) {
+  /**
+   * Loads the payment URL inside a container.
+   */ 
+  window.Coinify.openPaymentUrl = ( urlData, container, pspType ) => {
+    if ( !pspType ) {
       throw new Error( 'Invalid psp: ' + pspType );
     }
-    this.containerIsOverlay = false;
+    Coinify.containerIsOverlay = false;
     if ( !container ) {
-      container = this.createOverlay();
-      this.containerIsOverlay = true;
-      this.showOverlay();
+      container = Coinify.createOverlay();
+      Coinify.containerIsOverlay = true;
+      Coinify.showOverlay();
     }
     return new Promise( (cb, reject) => {
       let frame;
       if ( urlData.is3DS ) {
-        const callbackUrl = urlData.callbackUrl || this.callbackUrl3DS;
-        frame = this.create3DSFrame( urlData.url, urlData.PaReq, callbackUrl, cb );
+        const callbackUrl = urlData.callbackUrl || window.Coinify.callbackUrl3DS;
+        frame = window.Coinify.create3DSFrame( urlData.url, urlData.PaReq, callbackUrl, cb );
       } else {
-        const callbackUrl = urlData.callbackUrl || this.callbackUrlPayment;
-        frame = this.createPaymentFrame( urlData.url, cb );
+        const callbackUrl = urlData.callbackUrl || window.Coinify.callbackUrlPayment;
+        frame = window.Coinify.createPaymentFrame( urlData.url, cb );
       }
       container.appendChild(frame);
     });
-  }
+  };
 
-  public registerCard( cardData: CardData ) {
-    console.log( "REGISTER CARD!!!" );
-    this.getRequest( 'http://localhost:8087/cards/storeCardPayload' ).then( response => {
-      const payload = response.data.payload;
-      const psp = response.data.psp;
-      payload.cardData = this.state.cardData;
-      Coinify.createTemporaryCardToken( payload, psp ).then( (ret: any) => {
-        if ( ret && ret.status === "SUCCESS" ) {
-          console.log( "response ", ret );
-          this.saveCardByTempToken( ret.ccTempToken, payload.sessionToken,
-            /*ret.userTokenId, ret.clientRequestId,*/ ( saveCardRet: any ) => {
-            console.log( "Save card ret ", saveCardRet );
-          } );
-        } else {
-          console.error("FAILED", ret);
-        }
-      } );
-    } );
+})();
 
-    Coinify.getRequest( "" ).then( result => {
-      console.log( "get request ", result );
-    } ).catch( e: any ) => {
-      console.error( e );
-    } );
-  }
 
-  public handleTradePaymentInfo( trade: any, payload: any, pspType: string, cardData: CardData ): void {
-    console.log( "HANDLE TRADE INFO !" );
-  }
-}
 
-export function registerCard( cardData: CardData ) {
-  if ( !(window as any).coinify ) {
-    (window as any).coinify = new Coinify();
-  }
-  return (window as any).coinify.registerCard( cardData );
-}
-
-export function handleTradePaymentInfo( trade: any ) {
-  if ( !(window as any).coinify ) {
-    (window as any).coinify = new Coinify();
-  }
-  return (window as any).coinify.handleTradePaymentInfo( trade );
-}
-
-export function applyCardToTradeTransferInDetails( trade: any, payload: any, pspType: string, cardData: CardData ) {
-  return Coinify.applyCardToTradeTransferInDetails( trade, payload, pspType, cardData );
-}
