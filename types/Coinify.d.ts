@@ -20,7 +20,8 @@ export declare class Coinify {
         safecharge: string;
         isignthis: string;
     };
-    static getRequest(url: string, error: Function): Promise<{}>;
+    static getRequest(url: string): Promise<{}>;
+    static postRequest(url: string, values?: any): Promise<{}>;
     static applyCardToTradeTransferInDetails(tradeInfo: any, payload: any, pspType: string, cardData: any): any;
     loaded: boolean;
     loading: boolean;
@@ -35,6 +36,7 @@ export declare class Coinify {
     container3dsFrame: any;
     containerPay: any;
     containerIsOverlay: boolean;
+    private uri;
     private createOverlay;
     private createLoadingOverlay;
     private create3DSFrame;
@@ -48,10 +50,12 @@ export declare class Coinify {
      */
     private createTemporaryCardToken;
     private openPaymentUrl;
-    registerCard(cardData: CardData): void;
+    registerCard(options: any): Promise<any>;
     handleTradePaymentInfo(trade: any, payload: any, pspType: string, cardData: CardData): void;
+    private saveCardByTempToken;
 }
-export declare function registerCard(cardData: CardData): any;
+export declare function getCoinifyInstance(): any;
+export declare function registerCard(options: any): any;
 export declare function handleTradePaymentInfo(trade: any): any;
 export declare function applyCardToTradeTransferInDetails(trade: any, payload: any, pspType: string, cardData: CardData): any;
 //# sourceMappingURL=Coinify.d.ts.map

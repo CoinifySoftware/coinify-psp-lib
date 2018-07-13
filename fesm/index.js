@@ -90,7 +90,7 @@
 /*!************************!*\
   !*** ./src/Coinify.ts ***!
   \************************/
-/*! exports provided: CardData, UrlData, Coinify, registerCard, handleTradePaymentInfo, applyCardToTradeTransferInDetails */
+/*! exports provided: CardData, UrlData, Coinify, getCoinifyInstance, registerCard, handleTradePaymentInfo, applyCardToTradeTransferInDetails */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -98,9 +98,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "CardData", function() { return CardData; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "UrlData", function() { return UrlData; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Coinify", function() { return Coinify; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getCoinifyInstance", function() { return getCoinifyInstance; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "registerCard", function() { return registerCard; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "handleTradePaymentInfo", function() { return handleTradePaymentInfo; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "applyCardToTradeTransferInDetails", function() { return applyCardToTradeTransferInDetails; });
+console.log("*** Coinify PSP Library ***");
 class CardData {
     constructor() {
         this.cardNumber = '';
@@ -134,24 +136,23 @@ class Coinify {
         this.containerPay = undefined;
         this.containerIsOverlay = false;
     }
-    static getRequest(url, error) {
+    static getRequest(url) {
         return new Promise((callback, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('GET', url);
-            xhr.withCredentials = true;
+            //xhr.withCredentials = true;
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            //xhr.setRequestHeader("Access-Control-Allow-Headers","Access-Control-Allow-Headers,Origin,Content-Type,Accept");
+            //xhr.setRequestHeader("Access-Control-Allow-Origin", "*");
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.onreadystatechange = () => {
+                console.log("on ready state changed ", xhr.readyState);
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200 || (xhr.status === 0 && xhr.responseText !== '')) {
-                        callback({
-                            url: url,
-                            status: 200,
-                            body: xhr.responseText || ''
-                        });
+                        callback(JSON.parse(xhr.responseText || '{}'));
                     }
                     else {
-                        error({
+                        reject({
                             url: url,
                             status: xhr.status,
                             body: xhr.responseText || ''
@@ -160,6 +161,36 @@ class Coinify {
                 }
             };
             xhr.send();
+        });
+    }
+    static postRequest(url, values = {}) {
+        return new Promise((callback, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+            //xhr.withCredentials = true;
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = () => {
+                console.log("on ready state changed ", xhr.readyState);
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200 || (xhr.status === 0 && xhr.responseText !== '')) {
+                        callback(JSON.parse(xhr.responseText || '{}'));
+                        /*callback({
+                          url: url,
+                          status: 200,
+                          body: xhr.responseText || ''
+                        });*/
+                    }
+                    else {
+                        reject({
+                            url: url,
+                            status: xhr.status,
+                            body: xhr.responseText || ''
+                        });
+                    }
+                }
+            };
+            xhr.send(JSON.stringify(values));
         });
     }
     static applyCardToTradeTransferInDetails(tradeInfo, payload, pspType, cardData) {
@@ -172,6 +203,12 @@ class Coinify {
         // payload = Object.assign( {}, payload || {} );
         tradeInfo.transferIn.details = cardData;
         return tradeInfo;
+    }
+    uri(path) {
+        if (path[0] != '/') {
+            path = '/' + path;
+        }
+        return 'http://localhost:8087' + path;
     }
     createOverlay() {
         if (this.overlay) {
@@ -421,13 +458,15 @@ class Coinify {
     /**
      * Invoke the registerCard with some info like the following.
      */
-    createTemporaryCardToken(cardInfo, pspType) {
+    createTemporaryCardToken(payload, pspType) {
         if (pspType !== Coinify.PSPType.safecharge) {
             throw new Error('Invalid psp :' + pspType);
         }
         return new Promise((cb, reject) => {
+            console.log("fetching safecharge SDK.");
             this.initPSP(pspType).then((psp) => {
-                psp.card.createToken(cardInfo, (e) => {
+                console.log("creating token with payload ", payload);
+                psp.card.createToken(payload, (e) => {
                     cb(e);
                 });
             });
@@ -456,11 +495,37 @@ class Coinify {
             container.appendChild(frame);
         });
     }
-    registerCard(cardData) {
-        console.log("REGISTER CARD!!!");
+    registerCard(options) {
+        const cardData = options.card;
+        const saveCard = !!options.saveCard;
+        console.log("REGISTER CARD!!! ", cardData);
+        return new Promise((resolve, reject) => {
+            Coinify.getRequest(this.uri('/cards/storeCardPayload')).then((storeCardsPayloadResponse) => {
+                const payload = storeCardsPayloadResponse.payload;
+                const psp = storeCardsPayloadResponse.psp;
+                payload.cardData = cardData;
+                this.createTemporaryCardToken(payload, psp).then((tokenResponse) => {
+                    console.log("createTemporaryCardToken ", tokenResponse);
+                    if (tokenResponse && tokenResponse.status === "SUCCESS") {
+                        // console.log( "response ", tokenResponse );
+                        this.saveCardByTempToken(tokenResponse.ccTempToken, payload.sessionToken).then((saveCardResponse) => {
+                            console.log("saveCardResponse ", saveCardResponse);
+                            reject("Failed " + saveCardResponse);
+                        }).catch(reject);
+                    }
+                    else {
+                        console.error("Failed ", tokenResponse);
+                        reject("Failed " + tokenResponse);
+                    }
+                }).catch(reject);
+            }).catch(reject);
+        });
     }
     handleTradePaymentInfo(trade, payload, pspType, cardData) {
         console.log("HANDLE TRADE INFO !");
+    }
+    saveCardByTempToken(ccTempToken, sessionToken) {
+        return Coinify.postRequest(this.uri('/cards'), {});
     }
 }
 // Constants.
@@ -472,17 +537,19 @@ Coinify.PSPType = {
     safecharge: 'safecharge',
     isignthis: 'isignthis'
 };
-function registerCard(cardData) {
-    if (!window.coinify) {
-        window.coinify = new Coinify();
+function getCoinifyInstance() {
+    let i = window.coinifyInstance;
+    if (!i) {
+        console.log("created coinify instance ");
+        window.coinifyInstance = i = new Coinify();
     }
-    return window.coinify.registerCard(cardData);
+    return i;
+}
+function registerCard(options) {
+    return getCoinifyInstance().registerCard(options);
 }
 function handleTradePaymentInfo(trade) {
-    if (!window.coinify) {
-        window.coinify = new Coinify();
-    }
-    return window.coinify.handleTradePaymentInfo(trade);
+    return getCoinifyInstance().handleTradePaymentInfo(trade);
 }
 function applyCardToTradeTransferInDetails(trade, payload, pspType, cardData) {
     return Coinify.applyCardToTradeTransferInDetails(trade, payload, pspType, cardData);
@@ -495,7 +562,7 @@ function applyCardToTradeTransferInDetails(trade, payload, pspType, cardData) {
 /*!**********************!*\
   !*** ./src/index.ts ***!
   \**********************/
-/*! exports provided: CardData, UrlData, Coinify, registerCard, handleTradePaymentInfo, applyCardToTradeTransferInDetails */
+/*! exports provided: CardData, UrlData, Coinify, getCoinifyInstance, registerCard, handleTradePaymentInfo, applyCardToTradeTransferInDetails */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -506,6 +573,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "UrlData", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["UrlData"]; });
 
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "Coinify", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["Coinify"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "getCoinifyInstance", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["getCoinifyInstance"]; });
 
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "registerCard", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["registerCard"]; });
 

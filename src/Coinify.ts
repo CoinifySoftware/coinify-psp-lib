@@ -1,5 +1,7 @@
 import { IS_DEV } from './environment';
 
+console.log("*** Coinify PSP Library ***");
+
 export class CardData {
   public cardNumber: string = '';
   public cardHolder: string = '';
@@ -31,17 +33,16 @@ export class Coinify {
     return new Promise( (callback, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', url);
-      xhr.withCredentials = true;
+      //xhr.withCredentials = true;
       xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      //xhr.setRequestHeader("Access-Control-Allow-Headers","Access-Control-Allow-Headers,Origin,Content-Type,Accept");
+      //xhr.setRequestHeader("Access-Control-Allow-Origin", "*");
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.onreadystatechange = () => {
+        console.log( "on ready state changed ", xhr.readyState );
         if ( xhr.readyState === 4 ) {
           if ( xhr.status === 200 || ( xhr.status === 0 && xhr.responseText !== '' ) ) {
-            callback({
-              url: url,
-              status: 200,
-              body: xhr.responseText || ''
-            });
+            callback( JSON.parse( xhr.responseText || '{}' ) );
           }
           else {
             reject({
@@ -56,24 +57,26 @@ export class Coinify {
     } );
   }
 
-  public static postRequest( url: string, error: Function ) {
+  public static postRequest( url: string, values: any = {} ) {
     return new Promise( (callback, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url);
-      xhr.withCredentials = true;
+      //xhr.withCredentials = true;
       xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.onreadystatechange = () => {
+        console.log( "on ready state changed ", xhr.readyState );
         if ( xhr.readyState === 4 ) {
           if ( xhr.status === 200 || ( xhr.status === 0 && xhr.responseText !== '' ) ) {
-            callback({
+            callback( JSON.parse( xhr.responseText || '{}' ) );
+            /*callback({
               url: url,
               status: 200,
               body: xhr.responseText || ''
-            });
+            });*/
           }
           else {
-            error({
+            reject({
               url: url,
               status: xhr.status,
               body: xhr.responseText || ''
@@ -81,7 +84,7 @@ export class Coinify {
           }
         }
       };
-      xhr.send();
+      xhr.send( JSON.stringify(values) );
     } );
   }
 
@@ -114,6 +117,13 @@ export class Coinify {
   containerPay: any = undefined;
 
   containerIsOverlay = false;
+
+  private uri( path: string ): string {
+    if ( path[0] != '/' ) {
+      path = '/' + path;
+    }
+    return 'http://localhost:8087' + path;
+  }
 
   private createOverlay() {
     if ( this.overlay ) {
@@ -352,7 +362,6 @@ export class Coinify {
       throw new Error( "Already loading" );
     }
     return new Promise( (cb, reject) => {
-
       if ( this.loaded ) {
         cb( this.Safecharge );
         return;
@@ -368,7 +377,7 @@ export class Coinify {
       _script.onload = () => {
         self.loaded = !!this.Safecharge;
         self.loading = false;
-        if ( !self.loaded ) {
+        if ( !self.loaded ) { 
           throw new Error( 'Failed to load Safecharge library' );
         }
         cb( this.Safecharge );
@@ -381,13 +390,15 @@ export class Coinify {
   /**
    * Invoke the registerCard with some info like the following.
    */
-  private createTemporaryCardToken ( cardInfo: CardData, pspType: string ) {
+  private createTemporaryCardToken ( payload: any, pspType: string ) {
     if ( pspType !== Coinify.PSPType.safecharge ) {
       throw new Error( 'Invalid psp :' + pspType );
     }
     return new Promise( (cb, reject) => {
+      console.log( "fetching safecharge SDK." );
       this.initPSP( pspType ).then( ( psp: any ) => {
-        psp.card.createToken( cardInfo, ( e: Event ) => {
+        console.log( "creating token with payload ", payload );
+        psp.card.createToken( payload, ( e: Event ) => {
           cb( e );
         } );
       } );
@@ -417,49 +428,57 @@ export class Coinify {
     });
   }
 
-  public registerCard( cardData: CardData ) {
-    console.log( "REGISTER CARD!!!" );
-    this.getRequest( 'http://localhost:8087/cards/storeCardPayload' ).then( response => {
-      const payload = response.data.payload;
-      const psp = response.data.psp;
-      payload.cardData = this.state.cardData;
-      Coinify.createTemporaryCardToken( payload, psp ).then( (ret: any) => {
-        if ( ret && ret.status === "SUCCESS" ) {
-          console.log( "response ", ret );
-          this.saveCardByTempToken( ret.ccTempToken, payload.sessionToken,
-            /*ret.userTokenId, ret.clientRequestId,*/ ( saveCardRet: any ) => {
-            console.log( "Save card ret ", saveCardRet );
-          } );
-        } else {
-          console.error("FAILED", ret);
-        }
-      } );
-    } );
+  public registerCard( options: any ) {
+    const cardData = <CardData>options.card;
+    const saveCard = !!options.saveCard;
+    console.log( "REGISTER CARD!!! ", cardData );
 
-    Coinify.getRequest( "" ).then( result => {
-      console.log( "get request ", result );
-    } ).catch( e: any ) => {
-      console.error( e );
+    return new Promise<any>( ( resolve, reject ) => {
+      Coinify.getRequest( this.uri('/cards/storeCardPayload') ).then( (storeCardsPayloadResponse: any) => {
+        const payload = storeCardsPayloadResponse.payload;
+        const psp = storeCardsPayloadResponse.psp as string;
+        payload.cardData = cardData;
+        this.createTemporaryCardToken( payload, psp ).then( (tokenResponse: any) => {
+          console.log( "createTemporaryCardToken ", tokenResponse );
+          if ( tokenResponse && tokenResponse.status === "SUCCESS" ) {
+            // console.log( "response ", tokenResponse );
+            this.saveCardByTempToken( tokenResponse.ccTempToken, payload.sessionToken ).then( ( saveCardResponse: any ) => {
+              console.log( "saveCardResponse ", saveCardResponse );
+              reject( "Failed " + saveCardResponse );
+            } ).catch( reject );
+          } else {
+            console.error( "Failed ", tokenResponse );
+            reject( "Failed " + tokenResponse );
+          }
+        } ).catch( reject );
+      } ).catch( reject );
     } );
   }
 
   public handleTradePaymentInfo( trade: any, payload: any, pspType: string, cardData: CardData ): void {
     console.log( "HANDLE TRADE INFO !" );
   }
+
+  private saveCardByTempToken( ccTempToken: string, sessionToken: string ) {
+    return Coinify.postRequest( this.uri('/cards'), {} );
+  }
 }
 
-export function registerCard( cardData: CardData ) {
-  if ( !(window as any).coinify ) {
-    (window as any).coinify = new Coinify();
+export function getCoinifyInstance() {
+  let i = (window as any).coinifyInstance;
+  if ( !i ) {
+    console.log( "created coinify instance " );
+    (window as any).coinifyInstance = i = new Coinify();
   }
-  return (window as any).coinify.registerCard( cardData );
+  return i;
+}
+
+export function registerCard( options: any ) {
+  return getCoinifyInstance().registerCard( options );
 }
 
 export function handleTradePaymentInfo( trade: any ) {
-  if ( !(window as any).coinify ) {
-    (window as any).coinify = new Coinify();
-  }
-  return (window as any).coinify.handleTradePaymentInfo( trade );
+  return getCoinifyInstance().handleTradePaymentInfo( trade );
 }
 
 export function applyCardToTradeTransferInDetails( trade: any, payload: any, pspType: string, cardData: CardData ) {
