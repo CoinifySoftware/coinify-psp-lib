@@ -22,7 +22,7 @@ describe(`Coinify`, () => {
         details: undefined
       }
     };
-    const actual = Coinify.applyCardToTradeTransferInDetails( tradeInfo, {}, 'safecharge', savedCard );
+    const actual = Coinify.applyCardToTradeTransferInDetails( tradeInfo, { cardId: savedCard.cardId, provider: 'safecharge' } );
     const expected = 'Hello, World!'
     expect(tradeInfo.transferIn.details).not.toBe(undefined);
   })

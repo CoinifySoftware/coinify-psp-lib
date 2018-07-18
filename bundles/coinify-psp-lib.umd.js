@@ -100,27 +100,36 @@ return /******/ (function(modules) { // webpackBootstrap
 /*!************************!*\
   !*** ./src/Coinify.ts ***!
   \************************/
-/*! exports provided: CardData, UrlData, Coinify, getCoinifyInstance, registerCard, handleTradePaymentInfo, applyCardToTradeTransferInDetails */
+/*! exports provided: CardData, UrlData, CoinifyHttp, Coinify, getCoinifyInstance, registerCard, handleTradePaymentInfo, applyCardToTradeTransferInDetails, openHostedPaymentPage, getCardList, setOptions */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "CardData", function() { return CardData; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "UrlData", function() { return UrlData; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "CoinifyHttp", function() { return CoinifyHttp; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Coinify", function() { return Coinify; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getCoinifyInstance", function() { return getCoinifyInstance; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "registerCard", function() { return registerCard; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "handleTradePaymentInfo", function() { return handleTradePaymentInfo; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "applyCardToTradeTransferInDetails", function() { return applyCardToTradeTransferInDetails; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "openHostedPaymentPage", function() { return openHostedPaymentPage; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getCardList", function() { return getCardList; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "setOptions", function() { return setOptions; });
 console.log("*** Coinify PSP Library ***");
 var CardData = /** @class */ (function () {
     function CardData() {
         this.cardNumber = '';
-        this.cardHolder = '';
-        this.expireMonth = '';
-        this.expireYear = '';
+        this.cardHolderName = '';
+        this.expirationMonth = '';
+        this.expirationYear = '';
         this.CVV = 0;
     }
+    CardData.validate = function (card) {
+        if (!card.cardNumber || !card.cardHolderName || !card.CVV || !card.expirationYear || !card.expirationMonth) {
+            throw new Error('Invalid card data');
+        }
+    };
     return CardData;
 }());
 
@@ -131,26 +140,18 @@ var UrlData = /** @class */ (function () {
         this.callbackUrl = '';
         this.PaReq = '';
     }
+    UrlData.validate = function (urlData) {
+        if (urlData.is3DS === undefined || !urlData.url || !urlData.callbackUrl || (urlData.is3DS && !urlData.PaReq)) {
+            throw new Error('Invalid url data');
+        }
+    };
     return UrlData;
 }());
 
-var Coinify = /** @class */ (function () {
-    function Coinify() {
-        this.loaded = false;
-        this.loading = false;
-        this.overlay = undefined;
-        this.loadingOverlay = undefined;
-        this.container3ds = undefined;
-        this.callbackUrl3DS = "localhost:6564";
-        this.callbackUrlPayment = "localhost:1234";
-        this.container3dsForm = undefined;
-        this.container3dsi1 = undefined;
-        this.container3dsi2 = undefined;
-        this.container3dsFrame = undefined;
-        this.containerPay = undefined;
-        this.containerIsOverlay = false;
+var CoinifyHttp = /** @class */ (function () {
+    function CoinifyHttp() {
     }
-    Coinify.getRequest = function (url) {
+    CoinifyHttp.prototype.get = function (url) {
         return new Promise(function (callback, reject) {
             var xhr = new XMLHttpRequest();
             xhr.open('GET', url);
@@ -160,7 +161,6 @@ var Coinify = /** @class */ (function () {
             //xhr.setRequestHeader("Access-Control-Allow-Origin", "*");
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.onreadystatechange = function () {
-                console.log("on ready state changed ", xhr.readyState);
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200 || (xhr.status === 0 && xhr.responseText !== '')) {
                         callback(JSON.parse(xhr.responseText || '{}'));
@@ -177,7 +177,7 @@ var Coinify = /** @class */ (function () {
             xhr.send();
         });
     };
-    Coinify.postRequest = function (url, values) {
+    CoinifyHttp.prototype.post = function (url, values) {
         if (values === void 0) { values = {}; }
         return new Promise(function (callback, reject) {
             var xhr = new XMLHttpRequest();
@@ -186,7 +186,7 @@ var Coinify = /** @class */ (function () {
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.onreadystatechange = function () {
-                console.log("on ready state changed ", xhr.readyState);
+                // console.log( "on ready state changed ", xhr.readyState );
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200 || (xhr.status === 0 && xhr.responseText !== '')) {
                         callback(JSON.parse(xhr.responseText || '{}'));
@@ -208,15 +208,65 @@ var Coinify = /** @class */ (function () {
             xhr.send(JSON.stringify(values));
         });
     };
-    Coinify.applyCardToTradeTransferInDetails = function (tradeInfo, payload, pspType, cardData) {
-        if (pspType !== Coinify.PSPType.safecharge) {
-            throw new Error('Invalid psp: ' + pspType);
+    return CoinifyHttp;
+}());
+
+var Coinify = /** @class */ (function () {
+    function Coinify() {
+        this.provider = {
+            'safecharge': {
+                loaded: false,
+                loading: false
+            },
+            'isignthis': {
+                loaded: false,
+                loading: false
+            }
+        };
+        this.overlay = undefined;
+        this.loadingOverlay = undefined;
+        this.container3ds = undefined;
+        this.callbackUrl3DS = "localhost:6564";
+        this.callbackUrlPayment = "localhost:1234";
+        this.container3dsForm = undefined;
+        this.container3dsi1 = undefined;
+        this.container3dsi2 = undefined;
+        this.container3dsFrame = undefined;
+        this.istBaseUrl = 'https://verify.isignthis.com';
+        this.containerPay = undefined;
+        this.options = {
+            verbose: false
+        };
+        this.containerIsOverlay = false;
+    }
+    /**
+     * Used to apply the card on a tradeInfo object.
+     * It does so by adding it to the details.
+     */
+    Coinify.applyCardToTradeTransferInDetails = function (tradeInfo, atbs) {
+        var provider = atbs.psp || atbs.provider;
+        if (provider !== undefined && provider !== Coinify.PSPType.safecharge) {
+            throw new Error('Invalid psp: ' + provider);
         }
         if (!tradeInfo || !tradeInfo.transferIn) {
-            throw new Error('Invalid transfer in method.');
+            throw new Error('Invalid transfer In in trade info.');
         }
-        // payload = Object.assign( {}, payload || {} );
-        tradeInfo.transferIn.details = cardData;
+        var details = {
+            card: {}
+        };
+        if (atbs.cardId || atbs.upoId || atbs.externalTokenId) {
+            details.card.externalTokenId = atbs.cardId || atbs.upoId || atbs.externalTokenId;
+            // details.card.returnUrl = atbs.returnUrl || 'https://app.sandbox.coinify.com/';
+        }
+        else if (atbs.ccTempToken) {
+            details.card.ccTempToken = atbs.ccTempToken;
+            details.card.returnUrl = atbs.returnUrl || 'https://app.sandbox.coinify.com/';
+        }
+        else {
+            // TODO extend with token support.
+            throw new Error('externalTokenId/cardId/upoId or ccTempToken was not present amoungst the attributes when applying card data');
+        }
+        tradeInfo.transferIn.details = details;
         return tradeInfo;
     };
     Coinify.prototype.uri = function (path) {
@@ -229,7 +279,7 @@ var Coinify = /** @class */ (function () {
         if (this.overlay) {
             return this.overlay;
         }
-        console.log("Creating overlay");
+        this.log("Creating overlay");
         var o = this.overlay = document.createElement('div');
         o.className = "c-overlay c-is-hidden";
         o.id = "c-overlay";
@@ -252,7 +302,7 @@ var Coinify = /** @class */ (function () {
         if (this.loadingOverlay) {
             return this.loadingOverlay;
         }
-        console.log("Creating overlay");
+        this.log("Creating loading overlay");
         var o = this.loadingOverlay = document.createElement('div');
         o.className = "c-working-overlay c-is-hidden";
         o.id = "c-working-overlay";
@@ -311,7 +361,6 @@ var Coinify = /** @class */ (function () {
             }
             window.removeEventListener('message', eventHandler);
             var msg = JSON.parse(event.data.replace('[SC-Embed]', ''));
-            // console.log( "msg ", msg );
             if (msg.command == 'close') {
                 if (o.parentNode) {
                     o.parentNode.removeChild(o);
@@ -332,11 +381,11 @@ var Coinify = /** @class */ (function () {
         return o;
     };
     Coinify.prototype.createPaymentFrame = function (url, cb) {
-        var _this = this;
-        var o = this.containerPay;
+        var $ = this;
+        var o = $.containerPay;
         if (!o) {
             var body = document.getElementsByTagName('body')[0];
-            o = this.containerPay = document.createElement('div');
+            o = $.containerPay = document.createElement('div');
             o.className = "c-stretch";
             var _iframe = document.createElement('iframe');
             _iframe.setAttribute("id", "redirect-pay");
@@ -360,8 +409,8 @@ var Coinify = /** @class */ (function () {
             if (msg.command == 'close') {
                 if (o.parentNode) {
                     o.parentNode.removeChild(o);
-                    if (_this.containerIsOverlay) {
-                        _this.showOverlay(false);
+                    if ($.containerIsOverlay) {
+                        $.showOverlay(false);
                     }
                 }
                 if (callback) {
@@ -404,112 +453,293 @@ var Coinify = /** @class */ (function () {
         enumerable: true,
         configurable: true
     });
-    Coinify.prototype.initPSP = function (pspType) {
+    Coinify.prototype.initSafecharge = function (cb) {
         var _this = this;
-        if (pspType !== Coinify.PSPType.safecharge) {
+        var $ = this;
+        $.log("Loading safecharge SDK");
+        var _script = document.createElement('script');
+        _script.type = 'text/javascript';
+        _script.src = 'https://cdn.safecharge.com/js/v1/safecharge.js';
+        _script.onload = function () {
+            $.provider[Coinify.PSPType.safecharge].loaded = !!_this.Safecharge; // Important: this is the script referance in this context.
+            $.provider[Coinify.PSPType.safecharge].loading = false;
+            if (!$.provider[Coinify.PSPType.safecharge].loaded) {
+                throw new Error('Failed to load Safecharge library');
+            }
+            cb($.Safecharge);
+        };
+        var body = document.getElementsByTagName('body')[0];
+        body.appendChild(_script);
+    };
+    Coinify.prototype.init_iSignThis = function (cb) {
+        var _this = this;
+        var $ = this;
+        $.log('Initializing iSignThis');
+        var _script = document.createElement('script');
+        _script.src = $.istBaseUrl + '/js/isx-embed.js';
+        _script.async = true;
+        _script.onload = (function () {
+            $.iSignThis = _script;
+            $.provider[Coinify.PSPType.isignthis].loaded = !!_this.Safecharge; // Important: this is the script referance in this context.
+            $.provider[Coinify.PSPType.isignthis].loading = false;
+            cb(_script);
+        });
+    };
+    Coinify.prototype.isProviderLoaded = function (pspType) {
+        var $ = this;
+        pspType = $.validatePSP(pspType);
+        if (pspType === Coinify.PSPType.isignthis) {
+            return !!$.iSignThis;
+        }
+        return !!$.Safecharge;
+    };
+    Coinify.prototype.getScriptForProvider = function (pspType) {
+        var $ = this;
+        pspType = $.validatePSP(pspType);
+        if (pspType === Coinify.PSPType.isignthis) {
+            return $.iSignThis;
+        }
+        return $.Safecharge;
+    };
+    Coinify.prototype.validatePSP = function (pspType, fallbackOnSC) {
+        if (fallbackOnSC === void 0) { fallbackOnSC = true; }
+        if (!pspType && fallbackOnSC) {
+            console.error('Payment service provider not defined, falling back on safecharge');
+            return Coinify.PSPType.safecharge;
+        }
+        if (pspType !== Coinify.PSPType.safecharge &&
+            pspType !== Coinify.PSPType.isignthis) {
             throw new Error('Invalid psp :' + pspType);
         }
-        if (this.loading) {
+        return pspType;
+    };
+    Coinify.prototype.initPSP = function (pspType) {
+        var $ = this;
+        pspType = $.validatePSP(pspType);
+        if ($.provider[pspType].loading) {
             throw new Error("Already loading");
         }
         return new Promise(function (cb, reject) {
-            if (_this.loaded) {
-                cb(_this.Safecharge);
+            if ($.provider[pspType].loaded) {
+                cb($.getScriptForProvider(pspType));
                 return;
             }
             // Bootstrap SafeCharge and then execute the create token request,
-            var self = _this;
-            self.loaded = false;
-            self.loading = true;
-            var _script = document.createElement('script');
-            _script.type = 'text/javascript';
-            _script.src = 'https://cdn.safecharge.com/js/v1/safecharge.js';
-            _script.onload = function () {
-                self.loaded = !!_this.Safecharge;
-                self.loading = false;
-                if (!self.loaded) {
-                    throw new Error('Failed to load Safecharge library');
-                }
-                cb(_this.Safecharge);
-            };
-            var body = document.getElementsByTagName('body')[0];
-            body.appendChild(_script);
+            $.provider[pspType].loaded = false;
+            $.provider[pspType].loading = true;
+            if (pspType === Coinify.PSPType.isignthis) {
+                $.init_iSignThis(cb);
+            }
+            else if (pspType === Coinify.PSPType.safecharge) {
+                $.initSafecharge(cb);
+            }
         });
     };
     /**
      * Invoke the registerCard with some info like the following.
      */
     Coinify.prototype.createTemporaryCardToken = function (payload, pspType) {
-        var _this = this;
-        if (pspType !== Coinify.PSPType.safecharge) {
-            throw new Error('Invalid psp :' + pspType);
-        }
-        return new Promise(function (cb, reject) {
-            console.log("fetching safecharge SDK.");
-            _this.initPSP(pspType).then(function (psp) {
-                console.log("creating token with payload ", payload);
+        var $ = this;
+        pspType = $.validatePSP(pspType);
+        return new Promise(function (resolve, reject) {
+            $.initPSP(pspType).then(function (psp) {
+                $.log("Creating ccTempToken with payload " + JSON.stringify(payload || {}));
                 psp.card.createToken(payload, function (e) {
-                    cb(e);
+                    resolve(e);
                 });
+            }).catch(function (err) {
+                console.error('Error ', err);
+                reject(err);
             });
         });
     };
-    Coinify.prototype.openPaymentUrl = function (urlData, pspType, container) {
-        var _this = this;
-        if (!pspType || pspType !== Coinify.PSPType.safecharge) {
-            throw new Error('Invalid psp: ' + pspType);
+    Coinify.prototype.clearFrame = function () {
+        /* TODO: add the code to ensure we can open hosted payment page again and again...
+        // empty container of any existing elements
+        while (iFrameContainer.firstChild) {
+          iFrameContainer.removeChild(iFrameContainer.firstChild);
         }
-        this.containerIsOverlay = false;
+    
+        // add new SafeCharge iframe
+        iFrameContainer.appendChild( sciFrame );
+    
+        window.addEventListener( "message", event => {
+          if ( event.data.indexOf( scEmbed ) != 0 ) {
+            return;
+          }
+          const msg = JSON.parse( event.data.replace( '[SC-Embed]', '' ) );
+          if ( msg.command == 'close' ) {
+            if ( msg.param == 'cancelled' ) {
+              this.fire( 'cancel', null, { bubbles: false } );
+            } else {
+              this.fire( 'completed', null, { bubbles: false } );
+            }
+          }
+        }, true );
+        */
+    };
+    // construct new SafeCharge iFrame
+    Coinify.prototype.createiFrame = function () {
+        /*const iframe = document.createElement('iframe');
+        sciFrame.src = `${this.providerPaymentUrl}`;
+        sciFrame.id = 'iframe';
+        sciFrame.width = "100%";
+        sciFrame.scrolling = "no";
+        sciFrame.style = "border:none;";*/
+    };
+    Coinify.prototype.openPaymentUrl = function (urlData, pspType, container) {
+        var $ = this;
+        pspType = $.validatePSP(pspType);
+        UrlData.validate(urlData);
+        $.containerIsOverlay = false;
         if (!container) {
-            container = this.createOverlay();
-            this.containerIsOverlay = true;
-            this.showOverlay();
+            container = $.createOverlay();
+            $.containerIsOverlay = true;
+            $.showOverlay();
         }
         return new Promise(function (cb, reject) {
             var frame;
             if (urlData.is3DS) {
-                var callbackUrl = urlData.callbackUrl || _this.callbackUrl3DS;
-                frame = _this.create3DSFrame(urlData.url, urlData.PaReq, callbackUrl, cb);
+                var callbackUrl = urlData.callbackUrl || $.callbackUrl3DS;
+                frame = $.create3DSFrame(urlData.url, urlData.PaReq, callbackUrl, cb);
             }
             else {
-                var callbackUrl = urlData.callbackUrl || _this.callbackUrlPayment;
-                frame = _this.createPaymentFrame(urlData.url, cb);
+                var callbackUrl = urlData.callbackUrl || $.callbackUrlPayment;
+                frame = $.createPaymentFrame(urlData.url, cb);
             }
             container.appendChild(frame);
         });
     };
+    Coinify.prototype.setOptions = function (opts) {
+        this.options = opts;
+    };
+    Coinify.prototype.log = function (text) {
+        if (this.options.verbose) {
+            console.log('Coinify:', text);
+        }
+    };
     Coinify.prototype.registerCard = function (options) {
         var _this = this;
+        var $ = this;
         var cardData = options.card;
+        if (!cardData) {
+            throw new Error('No card data');
+        }
         var saveCard = !!options.saveCard;
-        console.log("REGISTER CARD!!! ", cardData);
+        CardData.validate(cardData);
+        $.log('Registering card; saving card: ' + (saveCard ? 'persistent' : 'temporary') + '; retrieving store card payload');
         return new Promise(function (resolve, reject) {
-            Coinify.getRequest(_this.uri('/cards/storeCardPayload')).then(function (storeCardsPayloadResponse) {
+            Coinify.http.get(_this.uri(Coinify.urls.storeCardPayload)).then(function (storeCardsPayloadResponse) {
                 var payload = storeCardsPayloadResponse.payload;
                 var psp = storeCardsPayloadResponse.psp;
                 payload.cardData = cardData;
-                _this.createTemporaryCardToken(payload, psp).then(function (tokenResponse) {
-                    console.log("createTemporaryCardToken ", tokenResponse);
-                    if (tokenResponse && tokenResponse.status === "SUCCESS") {
-                        // console.log( "response ", tokenResponse );
-                        _this.saveCardByTempToken(tokenResponse.ccTempToken, payload.sessionToken).then(function (saveCardResponse) {
-                            console.log("saveCardResponse ", saveCardResponse);
-                            reject("Failed " + saveCardResponse);
-                        }).catch(reject);
+                $.log('Registering card; Requesting ccTempToken');
+                $.createTemporaryCardToken(payload, psp).then(function (tokenResponse) {
+                    $.log('Registering card; Retrieved ccTempToken ' + tokenResponse.ccTempToken);
+                    var status = (tokenResponse || {}).status;
+                    if (status === "SUCCESS") {
+                        if (saveCard) {
+                            $.log('Registering card; saving cTempToken as userPaymentOption');
+                            $.saveCardByTempToken(tokenResponse.ccTempToken, payload.sessionToken).then(function (saveCardResponse) {
+                                $.log('Saved card: ' + status);
+                                resolve(saveCardResponse);
+                            }).catch(reject);
+                        }
+                        else {
+                            resolve(tokenResponse);
+                        }
                     }
                     else {
                         console.error("Failed ", tokenResponse);
-                        reject("Failed " + tokenResponse);
+                        reject("Failed " + status);
                     }
                 }).catch(reject);
             }).catch(reject);
         });
     };
-    Coinify.prototype.handleTradePaymentInfo = function (trade, payload, pspType, cardData) {
-        console.log("HANDLE TRADE INFO !");
+    Coinify.prototype.open3DSecureUrlForTrade = function (createTradeResponseTransferInDetails, container) {
+        if (container === void 0) { container = null; }
+        var $ = this;
+        var details = createTradeResponseTransferInDetails;
+        var provider = $.validatePSP(details.psp || details.provider);
+        if (!details.acsUrl) {
+            throw new Error('TransferIn details did not contain an acsUrl');
+        }
+        if (!details.paRequest) {
+            throw new Error('TransferIn details did not contain a paRequest');
+        }
+        var finalizeTradeArgs = {
+            PaRes: '',
+            sessionToken: details.sessionToken,
+            userTokenId: details.userTokenId,
+            clientRequestId: details.clientRequestId,
+            upoId: details.userPaymentOptionId || details.externalTokenId,
+            clientUniqueId: details.clientUniqueId,
+            orderId: details.orderId
+        };
+        Object.keys(finalizeTradeArgs).forEach(function (x) {
+            if (finalizeTradeArgs[x] === undefined) {
+                throw new Error('Missing argument ' + x);
+            }
+        });
+        return new Promise(function (resolve, reject) {
+            // TODO: Impl support to accept non-3ds cards as well.
+            var urlData = {
+                url: details.acsUrl,
+                PaReq: details.paRequest,
+                is3DS: true,
+                // set callback url // Fallback on the local url if a url is not given in the details.;
+                callbackUrl: details.threeDSecureCallback || Coinify.urls.threeDSecureCallback
+            };
+            $.log('Opening payment url');
+            $.openPaymentUrl(urlData, 'safecharge', container).then(function (PaRes) {
+                if (!PaRes) {
+                    console.error("Failed to retrieve 3DS response.");
+                    reject({ error: 'failed to auth3d', error_code: -5435 });
+                }
+                else {
+                    finalizeTradeArgs.PaRes = PaRes.toString();
+                    $.finalizePayment(finalizeTradeArgs).then(function (finalizePaymentResponse) {
+                        $.log("Payment Result: " + finalizePaymentResponse.status + " : " + finalizePaymentResponse.reason);
+                        resolve(finalizePaymentResponse);
+                    });
+                }
+            });
+        });
+    };
+    Coinify.prototype.finalizePayment = function (atbs) {
+        var _this = this;
+        if (!atbs.PaRes) {
+            throw new Error("Invalid argument; PARes");
+        }
+        return new Promise(function (resolve, reject) {
+            _this.log('Finalizing trade.');
+            Coinify.http.post(_this.uri('/cards/finalizePayment'), atbs).then(function (response) {
+                _this.log('Finalized payment for trade.');
+                resolve(response);
+            }).catch(reject);
+        });
     };
     Coinify.prototype.saveCardByTempToken = function (ccTempToken, sessionToken) {
-        return Coinify.postRequest(this.uri('/cards'), {});
+        if (!ccTempToken) {
+            throw new Error('invalid ccTempToken');
+        }
+        if (!sessionToken) {
+            throw new Error('invalid sessionToken');
+        }
+        this.log('Saving card by temp token');
+        return Coinify.http.post(this.uri('/cards'), {
+            ccTempToken: ccTempToken,
+            sessionToken: sessionToken
+        });
+    };
+    Coinify.prototype.getCardList = function () {
+        var _this = this;
+        return new Promise(function (resolve, reject) {
+            Coinify.http.get(_this.uri('cards')).then(function (cardList) {
+                resolve(cardList);
+            }).catch(reject);
+        });
     };
     // Constants.
     Coinify.Register = {
@@ -520,13 +750,18 @@ var Coinify = /** @class */ (function () {
         safecharge: 'safecharge',
         isignthis: 'isignthis'
     };
+    Coinify.urls = {
+        storeCardPayload: '/cards/storeCardPayload',
+        threeDSecureCallback: 'https://immense-hamlet-63274.herokuapp.com/?pares',
+        hostedPaymentPageCallback: 'www.google.com'
+    };
+    Coinify.http = new CoinifyHttp();
     return Coinify;
 }());
 
 function getCoinifyInstance() {
     var i = window.coinifyInstance;
     if (!i) {
-        console.log("created coinify instance ");
         window.coinifyInstance = i = new Coinify();
     }
     return i;
@@ -534,11 +769,35 @@ function getCoinifyInstance() {
 function registerCard(options) {
     return getCoinifyInstance().registerCard(options);
 }
-function handleTradePaymentInfo(trade) {
-    return getCoinifyInstance().handleTradePaymentInfo(trade);
+function handleTradePaymentInfo(createTradeResponseTransferInDetails, container) {
+    if (container === void 0) { container = null; }
+    var details = createTradeResponseTransferInDetails;
+    var coinify = getCoinifyInstance();
+    console.log("handle trade payment info ", details);
+    if (details.acsUrl || details.paRequest) {
+        return coinify.open3DSecureUrlForTrade(details, container);
+    }
+    return coinify.openPaymentUrl({
+        url: details.redirectUrl,
+        is3DS: false,
+        callbackUrl: details.returnUrl || Coinify.urls.hostedPaymentPageCallback,
+        PaReq: undefined
+    }, details.provider, container);
 }
-function applyCardToTradeTransferInDetails(trade, payload, pspType, cardData) {
-    return Coinify.applyCardToTradeTransferInDetails(trade, payload, pspType, cardData);
+function applyCardToTradeTransferInDetails(tradeInfo, atbs) {
+    return Coinify.applyCardToTradeTransferInDetails(tradeInfo, atbs);
+}
+function openHostedPaymentPage(url, provider, container) {
+    if (provider === void 0) { provider = 'safecharge'; }
+    if (container === void 0) { container = undefined; }
+    var args = { url: url, is3DS: false, callbackUrl: Coinify.urls.hostedPaymentPageCallback, PaReq: undefined };
+    return getCoinifyInstance().openPaymentUrl(args, provider, container);
+}
+function getCardList() {
+    return getCoinifyInstance().getCardList();
+}
+function setOptions(opts) {
+    return getCoinifyInstance().setOptions(opts);
 }
 
 
@@ -548,7 +807,7 @@ function applyCardToTradeTransferInDetails(trade, payload, pspType, cardData) {
 /*!**********************!*\
   !*** ./src/index.ts ***!
   \**********************/
-/*! exports provided: CardData, UrlData, Coinify, getCoinifyInstance, registerCard, handleTradePaymentInfo, applyCardToTradeTransferInDetails */
+/*! exports provided: CardData, UrlData, CoinifyHttp, Coinify, getCoinifyInstance, registerCard, handleTradePaymentInfo, applyCardToTradeTransferInDetails, openHostedPaymentPage, getCardList, setOptions */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -557,6 +816,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "CardData", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["CardData"]; });
 
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "UrlData", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["UrlData"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "CoinifyHttp", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["CoinifyHttp"]; });
 
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "Coinify", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["Coinify"]; });
 
@@ -567,6 +828,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "handleTradePaymentInfo", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["handleTradePaymentInfo"]; });
 
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "applyCardToTradeTransferInDetails", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["applyCardToTradeTransferInDetails"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "openHostedPaymentPage", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["openHostedPaymentPage"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "getCardList", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["getCardList"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "setOptions", function() { return _Coinify__WEBPACK_IMPORTED_MODULE_0__["setOptions"]; });
 
 
 

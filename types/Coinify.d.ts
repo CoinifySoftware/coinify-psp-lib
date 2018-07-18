@@ -1,15 +1,21 @@
 export declare class CardData {
+    static validate(card: CardData): void;
     cardNumber: string;
-    cardHolder: string;
-    expireMonth: string;
-    expireYear: string;
+    cardHolderName: string;
+    expirationMonth: string;
+    expirationYear: string;
     CVV: number;
 }
 export declare class UrlData {
+    static validate(urlData: UrlData): void;
     is3DS: boolean;
     url: string;
     callbackUrl: string;
     PaReq: string;
+}
+export declare class CoinifyHttp {
+    get(url: string): Promise<{}>;
+    post(url: string, values?: any): Promise<{}>;
 }
 export declare class Coinify {
     static Register: {
@@ -20,11 +26,27 @@ export declare class Coinify {
         safecharge: string;
         isignthis: string;
     };
-    static getRequest(url: string): Promise<{}>;
-    static postRequest(url: string, values?: any): Promise<{}>;
-    static applyCardToTradeTransferInDetails(tradeInfo: any, payload: any, pspType: string, cardData: any): any;
-    loaded: boolean;
-    loading: boolean;
+    static urls: {
+        storeCardPayload: string;
+        threeDSecureCallback: string;
+        hostedPaymentPageCallback: string;
+    };
+    static http: CoinifyHttp;
+    /**
+     * Used to apply the card on a tradeInfo object.
+     * It does so by adding it to the details.
+     */
+    static applyCardToTradeTransferInDetails(tradeInfo: any, atbs: any): any;
+    provider: {
+        'safecharge': {
+            loaded: boolean;
+            loading: boolean;
+        };
+        'isignthis': {
+            loaded: boolean;
+            loading: boolean;
+        };
+    };
     overlay: any;
     loadingOverlay: any;
     container3ds: any;
@@ -34,7 +56,10 @@ export declare class Coinify {
     container3dsi1: any;
     container3dsi2: any;
     container3dsFrame: any;
+    istBaseUrl: string;
     containerPay: any;
+    private options;
+    iSignThis: any;
     containerIsOverlay: boolean;
     private uri;
     private createOverlay;
@@ -44,18 +69,35 @@ export declare class Coinify {
     private showOverlay;
     private showLoadingOverlay;
     private readonly Safecharge;
+    private initSafecharge;
+    private init_iSignThis;
+    private isProviderLoaded;
+    private getScriptForProvider;
+    private validatePSP;
     private initPSP;
     /**
      * Invoke the registerCard with some info like the following.
      */
     private createTemporaryCardToken;
+    private clearFrame;
+    createiFrame(): void;
     private openPaymentUrl;
-    registerCard(options: any): Promise<any>;
-    handleTradePaymentInfo(trade: any, payload: any, pspType: string, cardData: CardData): void;
+    setOptions(opts: any): void;
+    private log;
+    registerCard(options: {
+        card: CardData;
+        saveCard: boolean;
+    }): Promise<any>;
+    open3DSecureUrlForTrade(createTradeResponseTransferInDetails: any, container?: any): Promise<any>;
+    private finalizePayment;
     private saveCardByTempToken;
+    private getCardList;
 }
 export declare function getCoinifyInstance(): any;
 export declare function registerCard(options: any): any;
-export declare function handleTradePaymentInfo(trade: any): any;
-export declare function applyCardToTradeTransferInDetails(trade: any, payload: any, pspType: string, cardData: CardData): any;
+export declare function handleTradePaymentInfo(createTradeResponseTransferInDetails: any, container?: any): any;
+export declare function applyCardToTradeTransferInDetails(tradeInfo: any, atbs: any): any;
+export declare function openHostedPaymentPage(url: string, provider?: string, container?: any): any;
+export declare function getCardList(): any;
+export declare function setOptions(opts: any): any;
 //# sourceMappingURL=Coinify.d.ts.map

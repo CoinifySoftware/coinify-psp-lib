@@ -18,7 +18,7 @@ describe("Coinify", function () {
                 details: undefined
             }
         };
-        var actual = Coinify.applyCardToTradeTransferInDetails(tradeInfo, {}, 'safecharge', savedCard);
+        var actual = Coinify.applyCardToTradeTransferInDetails(tradeInfo, { cardId: savedCard.cardId, provider: 'safecharge' });
         var expected = 'Hello, World!';
         expect(tradeInfo.transferIn.details).not.toBe(undefined);
     });
