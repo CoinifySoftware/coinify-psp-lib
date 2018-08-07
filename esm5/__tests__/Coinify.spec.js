@@ -10,7 +10,7 @@ describe("Coinify", function () {
     });
     it("should apply saved card to trade info", function () {
         var savedCard = {
-            cardId: '1234'
+            cardExternalId: '1234'
         };
         var tradeInfo = {
             transferIn: {
@@ -18,8 +18,7 @@ describe("Coinify", function () {
                 details: undefined
             }
         };
-        var actual = Coinify.applyCardToTradeTransferInDetails(tradeInfo, { cardId: savedCard.cardId, provider: 'safecharge' });
-        var expected = 'Hello, World!';
+        var actual = Coinify.applyCardToTradeTransferInDetails(tradeInfo, { cardExternalId: savedCard.cardExternalId, provider: 'safecharge' });
         expect(tradeInfo.transferIn.details).not.toBe(undefined);
     });
     /*it(`should greet and print deprecation message if in dev mode`, () => {

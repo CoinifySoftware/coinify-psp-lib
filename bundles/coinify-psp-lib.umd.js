@@ -261,9 +261,8 @@ var Coinify = /** @class */ (function () {
         var details = {
             card: {}
         };
-        if (atbs.cardId || atbs.upoId || atbs.externalTokenId) {
-            details.card.externalTokenId = atbs.cardId || atbs.upoId || atbs.externalTokenId;
-            // details.card.returnUrl = atbs.returnUrl || 'https://app.sandbox.coinify.com/';
+        if (atbs.cardExternalId) {
+            details.card.cardExternalId = atbs.cardExternalId;
         }
         else if (atbs.ccTempToken) {
             details.card.ccTempToken = atbs.ccTempToken;
@@ -271,7 +270,7 @@ var Coinify = /** @class */ (function () {
         }
         else {
             // TODO extend with token support.
-            throw new Error('externalTokenId/cardId/upoId or ccTempToken was not present amoungst the attributes when applying card data');
+            throw new Error('cardExternalId or ccTempToken was not present amoungst the attributes when applying card data');
         }
         tradeInfo.transferIn.details = details;
         return tradeInfo;

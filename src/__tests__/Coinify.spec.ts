@@ -14,7 +14,7 @@ describe(`Coinify`, () => {
 
   it(`should apply saved card to trade info`, () => {
     const savedCard = {
-      cardId: '1234'
+      cardExternalId: '1234'
     };
     const tradeInfo = {
       transferIn: {
@@ -22,8 +22,7 @@ describe(`Coinify`, () => {
         details: undefined
       }
     };
-    const actual = Coinify.applyCardToTradeTransferInDetails( tradeInfo, { cardId: savedCard.cardId, provider: 'safecharge' } );
-    const expected = 'Hello, World!'
+    const actual = Coinify.applyCardToTradeTransferInDetails( tradeInfo, { cardExternalId: savedCard.cardExternalId, provider: 'safecharge' } );
     expect(tradeInfo.transferIn.details).not.toBe(undefined);
   })
 
