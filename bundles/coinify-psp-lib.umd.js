@@ -626,8 +626,8 @@ var Coinify = /** @class */ (function () {
         });
     };
     Coinify.prototype.setOptions = function (opts) {
-        console.log("opts", opts);
         var $ = this;
+        $.log("Setting option(s) " + (opts ? JSON.stringify(opts) : 'undefined'));
         if (!$.options) {
             $.options = opts;
         }
@@ -669,7 +669,6 @@ var Coinify = /** @class */ (function () {
         CardData.validate(cardData);
         $.log('Registering card; saving card: ' + (saveCard ? 'persistent' : 'temporary') + '; retrieving store card payload');
         return new Promise(function (resolve, reject) {
-            console.log("this.options.accessToken ", _this.options.accessToken);
             Coinify.http.get(_this.uri(Coinify.urls.storeCardPayload), _this.options.accessToken).then(function (storeCardsPayloadResponse) {
                 var payload = Object.assign({}, storeCardsPayloadResponse.payload);
                 payload.sessionToken = payload.sessionToken || storeCardsPayloadResponse.sessionToken;
@@ -817,7 +816,7 @@ function handleTradePaymentInfo(createTradeResponseTransferInDetails, container)
     if (container === void 0) { container = null; }
     var details = createTradeResponseTransferInDetails;
     var coinify = getCoinifyInstance();
-    console.log("handle trade payment info ", details);
+    coinify.log("Handle trade payment info ", details);
     if (details.acsUrl || details.paRequest) {
         return coinify.open3DSecureUrlForTrade(details, container);
     }
