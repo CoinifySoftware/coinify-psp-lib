@@ -14,8 +14,8 @@ export declare class UrlData {
     PaReq: string;
 }
 export declare class CoinifyHttp {
-    get(url: string): Promise<{}>;
-    post(url: string, values?: any): Promise<{}>;
+    get(url: string, accessToken?: any): Promise<{}>;
+    post(url: string, values?: any, accessToken?: string): Promise<{}>;
 }
 export declare class Coinify {
     static Register: {
@@ -27,9 +27,11 @@ export declare class Coinify {
         isignthis: string;
     };
     static urls: {
-        storeCardPayload: string;
         threeDSecureCallback: string;
         hostedPaymentPageCallback: string;
+        storeCardPayload: string;
+        finalizePayment: string;
+        cards: string;
     };
     static http: CoinifyHttp;
     /**
@@ -52,6 +54,7 @@ export declare class Coinify {
     container3ds: any;
     callbackUrl3DS: string;
     callbackUrlPayment: string;
+    coinifyApiBaseUrl: string;
     container3dsForm: any;
     container3dsi1: any;
     container3dsi2: any;
@@ -61,8 +64,10 @@ export declare class Coinify {
     private options;
     iSignThis: any;
     containerIsOverlay: boolean;
+    cssLoaded: boolean;
     private uri;
     private createOverlay;
+    private ensureCSSLoaded;
     private createLoadingOverlay;
     private create3DSFrame;
     private createPaymentFrame;
@@ -79,8 +84,6 @@ export declare class Coinify {
      * Invoke the registerCard with some info like the following.
      */
     private createTemporaryCardToken;
-    private clearFrame;
-    createiFrame(): void;
     private openPaymentUrl;
     setOptions(opts: any): void;
     private log;
