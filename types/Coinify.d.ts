@@ -11,7 +11,7 @@ export declare class UrlData {
     is3DS: boolean;
     url: string;
     callbackUrl: string;
-    PaReq: string;
+    paRequest: string;
 }
 export declare class CoinifyHttp {
     get(url: string, accessToken?: any): Promise<{}>;

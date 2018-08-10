@@ -138,10 +138,10 @@ var UrlData = /** @class */ (function () {
         this.is3DS = false;
         this.url = '';
         this.callbackUrl = '';
-        this.PaReq = '';
+        this.paRequest = '';
     }
     UrlData.validate = function (urlData) {
-        if (urlData.is3DS === undefined || !urlData.url || !urlData.callbackUrl || (urlData.is3DS && !urlData.PaReq)) {
+        if (urlData.is3DS === undefined || !urlData.url || !urlData.callbackUrl || (urlData.is3DS && !urlData.paRequest)) {
             throw new Error('Invalid url data');
         }
     };
@@ -325,7 +325,7 @@ var Coinify = /** @class */ (function () {
         this.ensureCSSLoaded();
         return o;
     };
-    Coinify.prototype.create3DSFrame = function (url, PARequest, iframeCallbackUrl, cb) {
+    Coinify.prototype.create3DSFrame = function (url, paRequest, iframeCallbackUrl, cb) {
         var _this = this;
         var o = this.container3ds;
         if (!o) {
@@ -343,7 +343,7 @@ var Coinify = /** @class */ (function () {
             _iframe.setAttribute("name", "coinify-3dsframe");
             _iframe.className = "c-stretch";
             _iframe.scrolling = "no";
-            _iframe.setAttribute("style", "border: none;");
+            _iframe.setAttribute("style", "border: none; width: 100%; min-height: 350px;");
             i1.setAttribute("type", "hidden");
             i1.setAttribute("name", "PaReq");
             i2.setAttribute("type", "hidden");
@@ -356,7 +356,7 @@ var Coinify = /** @class */ (function () {
             this.ensureCSSLoaded();
         }
         this.container3dsForm.setAttribute("action", url);
-        this.container3dsi1.setAttribute("value", PARequest);
+        this.container3dsi1.setAttribute("value", paRequest);
         this.container3dsi2.setAttribute("value", iframeCallbackUrl);
         //console.log("submit paRequest:" + PARequest + " url:" + url );
         var callback = cb;
@@ -615,7 +615,7 @@ var Coinify = /** @class */ (function () {
             var frame;
             if (urlData.is3DS) {
                 var callbackUrl = urlData.callbackUrl || $.callbackUrl3DS;
-                frame = $.create3DSFrame(urlData.url, urlData.PaReq, callbackUrl, cb);
+                frame = $.create3DSFrame(urlData.url, urlData.paRequest, callbackUrl, cb);
             }
             else {
                 var callbackUrl = urlData.callbackUrl || $.callbackUrlPayment;
@@ -709,13 +709,9 @@ var Coinify = /** @class */ (function () {
             throw new Error('TransferIn details did not contain a paRequest');
         }
         var finalizeTradeArgs = {
-            PaRes: '',
-            sessionToken: details.sessionToken,
-            userTokenId: details.userTokenId,
-            clientRequestId: details.clientRequestId,
-            upoId: details.userPaymentOptionId || details.externalTokenId,
-            clientUniqueId: details.clientUniqueId,
-            orderId: details.orderId
+            paResponse: '',
+            tradeId: details.tradeId,
+            CVV: details.CVV
         };
         Object.keys(finalizeTradeArgs).forEach(function (x) {
             if (finalizeTradeArgs[x] === undefined) {
@@ -726,19 +722,19 @@ var Coinify = /** @class */ (function () {
             // TODO: Impl support to accept non-3ds cards as well.
             var urlData = {
                 url: details.acsUrl,
-                PaReq: details.paRequest,
+                paRequest: details.paRequest,
                 is3DS: true,
                 // set callback url // Fallback on the local url if a url is not given in the details.;
                 callbackUrl: details.threeDSecureCallback || Coinify.urls.threeDSecureCallback
             };
             $.log('Opening payment url');
-            $.openPaymentUrl(urlData, 'safecharge', container).then(function (PaRes) {
-                if (!PaRes) {
+            $.openPaymentUrl(urlData, 'safecharge', container).then(function (paResponse) {
+                if (!paResponse) {
                     console.error("Failed to retrieve 3DS response.");
                     reject({ error: 'failed to auth3d', error_code: -5435 });
                 }
                 else {
-                    finalizeTradeArgs.PaRes = PaRes.toString();
+                    finalizeTradeArgs.paResponse = paResponse.toString();
                     $.finalizePayment(finalizeTradeArgs).then(function (finalizePaymentResponse) {
                         $.log("Payment Result: " + finalizePaymentResponse.status + " : " + finalizePaymentResponse.reason);
                         resolve(finalizePaymentResponse);
@@ -749,8 +745,8 @@ var Coinify = /** @class */ (function () {
     };
     Coinify.prototype.finalizePayment = function (atbs) {
         var _this = this;
-        if (!atbs.PaRes) {
-            throw new Error("Invalid argument; PARes");
+        if (!atbs.paResponse) {
+            throw new Error("Invalid argument; paResponse is not defined");
         }
         return new Promise(function (resolve, reject) {
             _this.log('Finalizing trade.');
@@ -793,7 +789,7 @@ var Coinify = /** @class */ (function () {
     Coinify.urls = {
         threeDSecureCallback: 'https://immense-hamlet-63274.herokuapp.com/?pares',
         hostedPaymentPageCallback: 'www.google.com',
-        storeCardPayload: '/cards/storeCardPayload',
+        storeCardPayload: '/cards/store-card-payload',
         finalizePayment: '/cards/finalize-payment',
         cards: '/cards'
     };
@@ -823,7 +819,7 @@ function handleTradePaymentInfo(createTradeResponseTransferInDetails, container)
         url: details.redirectUrl,
         is3DS: false,
         callbackUrl: details.returnUrl || Coinify.urls.hostedPaymentPageCallback,
-        PaReq: undefined
+        paRequest: undefined
     }, details.provider, container);
 }
 function applyCardToTradeTransferInDetails(tradeInfo, atbs) {
@@ -832,7 +828,7 @@ function applyCardToTradeTransferInDetails(tradeInfo, atbs) {
 function openHostedPaymentPage(url, provider, container) {
     if (provider === void 0) { provider = 'safecharge'; }
     if (container === void 0) { container = undefined; }
-    var args = { url: url, is3DS: false, callbackUrl: Coinify.urls.hostedPaymentPageCallback, PaReq: undefined };
+    var args = { url: url, is3DS: false, callbackUrl: Coinify.urls.hostedPaymentPageCallback, paRequest: undefined };
     return getCoinifyInstance().openPaymentUrl(args, provider, container);
 }
 function getCardList() {
