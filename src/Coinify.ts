@@ -654,6 +654,7 @@ export class Coinify {
                 resolve( saveCardResponse );
               } ).catch( reject );
             } else {
+              tokenResponse.sessionToken = storeCardsPayloadResponse.sessionToken;
               resolve( tokenResponse );
             }
           } else {

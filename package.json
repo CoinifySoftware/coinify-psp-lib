@@ -42,7 +42,9 @@
     "release:preflight": "npm pack",
     "size": "npm run size:umd && npm run size:fasm",
     "size:umd": "shx echo \"Gzipped UMD bundle Size:\" && cross-var strip-json-comments --no-whitespace $npm_package_main | gzip-size",
-    "size:fasm": "shx echo \"Gzipped FESM bundle Size:\" && strip-json-comments --no-whitespace \"./fesm/index.js\" | gzip-size"
+    "size:fasm": "shx echo \"Gzipped FESM bundle Size:\" && strip-json-comments --no-whitespace \"./fesm/index.js\" | gzip-size",
+    "publish-please": "publish-please",
+    "prepublishOnly2": "publish-please guard"
   },
   "config": {
     "commitizen": {
@@ -90,6 +92,7 @@
     "jest": "23.2.0",
     "lint-staged": "7.2.0",
     "prettier": "1.13.6",
+    "publish-please": "^3.2.0",
     "shx": "0.3.1",
     "standard-version": "4.4.0",
     "strip-json-comments-cli": "1.0.1",

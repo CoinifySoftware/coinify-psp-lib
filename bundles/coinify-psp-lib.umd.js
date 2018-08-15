@@ -686,6 +686,7 @@ var Coinify = /** @class */ (function () {
                             }).catch(reject);
                         }
                         else {
+                            tokenResponse.sessionToken = storeCardsPayloadResponse.sessionToken;
                             resolve(tokenResponse);
                         }
                     }
