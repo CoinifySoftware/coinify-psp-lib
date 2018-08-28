@@ -69,18 +69,13 @@ export class CoinifyHttp {
         if ( xhr.readyState === 4 ) {
           if ( xhr.status === 200 || ( xhr.status === 0 && xhr.responseText !== '' ) ) {
             callback( JSON.parse( xhr.responseText || '{}' ) );
-            /*callback({
-              url: url,
-              status: 200,
-              body: xhr.responseText || ''
-            });*/
           }
           else {
-            reject({
+            reject( {
               url: url,
               status: xhr.status,
               body: xhr.responseText || ''
-            });
+            } );
           }
         }
       };
@@ -646,7 +641,7 @@ export class Coinify {
         $.createTemporaryCardToken( payload, provider ).then( ( tokenResponse: any ) => {
           $.log( 'Registering card; Retrieved ccTempToken ' + tokenResponse.ccTempToken );
           const status = (tokenResponse||{}).status;
-          if ( status === "SUCCESS" ) {
+          if ( (status||'').toLowerCase() === 'success' ) {
             if ( saveCard ) {
               $.log('Registering card; saving cTempToken as userPaymentOption' );
               $.saveCardByTempToken( tokenResponse.ccTempToken, payload.sessionToken ).then( ( saveCardResponse: any ) => {
@@ -654,16 +649,19 @@ export class Coinify {
                 resolve( saveCardResponse );
               } ).catch( reject );
             } else {
-              console.log("tokenResponse ", tokenResponse);
               tokenResponse.sessionToken = payload.sessionToken;
               resolve( tokenResponse );
             }
           } else {
             console.error( "Failed ", tokenResponse );
-            reject( "Failed " + status );
+            reject( { status: "Failed " + status } );
           }
-        } ).catch( reject );
-      } ).catch( reject );
+        } ).catch( createTemporaryCardTokenError => {
+          reject( createTemporaryCardTokenError );
+        } );
+      } ).catch( getError => {
+        reject( getError );
+      } );
     } );
   }
 
@@ -685,6 +683,7 @@ export class Coinify {
       tradeId: details.tradeId,
       CVV: details.CVV
     };
+
     Object.keys(finalizeTradeArgs).forEach( x => {
       if ( finalizeTradeArgs[x] === undefined ) {
         throw new Error( 'Missing argument ' + x );
@@ -711,8 +710,12 @@ export class Coinify {
           $.finalizePayment( finalizeTradeArgs ).then( (finalizePaymentResponse: any) => {
             $.log( "Payment Result: " + finalizePaymentResponse.status + " : " + finalizePaymentResponse.reason );
             resolve( finalizePaymentResponse );
+          } ).catch( errFinalizePayment => {
+            reject(errFinalizePayment);
           } );
         }
+      } ).catch( errOpenUrl => {
+        reject(errOpenUrl);
       } );
     } );
   }
@@ -732,7 +735,9 @@ export class Coinify {
       Coinify.http.post( this.uri( Coinify.urls.finalizePayment ), atbs, this.options.accessToken ).then( (response: any) => {
         this.log( 'Finalized payment for trade.' );
         resolve( response );
-      } ).catch( reject );
+      } ).catch( errInPostRequest => {
+        reject(errInPostRequest);
+      } );
     } );
   }
 
@@ -754,7 +759,9 @@ export class Coinify {
     return new Promise<any>( (resolve, reject) => {
       Coinify.http.get( this.uri( Coinify.urls.cards ), this.options.accessToken ).then( ( cardList: any ) => {
         resolve( cardList );
-      } ).catch( reject );
+      } ).catch( getError => {
+        reject(getError); 
+      } );
     } );
   }
 }

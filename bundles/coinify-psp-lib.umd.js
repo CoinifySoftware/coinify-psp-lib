@@ -194,11 +194,6 @@ var CoinifyHttp = /** @class */ (function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200 || (xhr.status === 0 && xhr.responseText !== '')) {
                         callback(JSON.parse(xhr.responseText || '{}'));
-                        /*callback({
-                          url: url,
-                          status: 200,
-                          body: xhr.responseText || ''
-                        });*/
                     }
                     else {
                         reject({
@@ -677,7 +672,7 @@ var Coinify = /** @class */ (function () {
                 $.createTemporaryCardToken(payload, provider).then(function (tokenResponse) {
                     $.log('Registering card; Retrieved ccTempToken ' + tokenResponse.ccTempToken);
                     var status = (tokenResponse || {}).status;
-                    if (status === "SUCCESS") {
+                    if ((status || '').toLowerCase() === 'success') {
                         if (saveCard) {
                             $.log('Registering card; saving cTempToken as userPaymentOption');
                             $.saveCardByTempToken(tokenResponse.ccTempToken, payload.sessionToken).then(function (saveCardResponse) {
@@ -686,17 +681,20 @@ var Coinify = /** @class */ (function () {
                             }).catch(reject);
                         }
                         else {
-                            console.log("tokenResponse ", tokenResponse);
                             tokenResponse.sessionToken = payload.sessionToken;
                             resolve(tokenResponse);
                         }
                     }
                     else {
                         console.error("Failed ", tokenResponse);
-                        reject("Failed " + status);
+                        reject({ status: "Failed " + status });
                     }
-                }).catch(reject);
-            }).catch(reject);
+                }).catch(function (createTemporaryCardTokenError) {
+                    reject(createTemporaryCardTokenError);
+                });
+            }).catch(function (getError) {
+                reject(getError);
+            });
         });
     };
     Coinify.prototype.open3DSecureUrlForTrade = function (createTradeResponseTransferInDetails, container) {
@@ -740,8 +738,12 @@ var Coinify = /** @class */ (function () {
                     $.finalizePayment(finalizeTradeArgs).then(function (finalizePaymentResponse) {
                         $.log("Payment Result: " + finalizePaymentResponse.status + " : " + finalizePaymentResponse.reason);
                         resolve(finalizePaymentResponse);
+                    }).catch(function (errFinalizePayment) {
+                        reject(errFinalizePayment);
                     });
                 }
+            }).catch(function (errOpenUrl) {
+                reject(errOpenUrl);
             });
         });
     };
@@ -755,7 +757,9 @@ var Coinify = /** @class */ (function () {
             Coinify.http.post(_this.uri(Coinify.urls.finalizePayment), atbs, _this.options.accessToken).then(function (response) {
                 _this.log('Finalized payment for trade.');
                 resolve(response);
-            }).catch(reject);
+            }).catch(function (errInPostRequest) {
+                reject(errInPostRequest);
+            });
         });
     };
     Coinify.prototype.saveCardByTempToken = function (ccTempToken, sessionToken) {
@@ -776,7 +780,9 @@ var Coinify = /** @class */ (function () {
         return new Promise(function (resolve, reject) {
             Coinify.http.get(_this.uri(Coinify.urls.cards), _this.options.accessToken).then(function (cardList) {
                 resolve(cardList);
-            }).catch(reject);
+            }).catch(function (getError) {
+                reject(getError);
+            });
         });
     };
     // Constants.
